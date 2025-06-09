@@ -22,13 +22,30 @@
       }
 
       .game-container {
-        width: 400px;
-        height: 600px;
+        width: 100%;
+        max-width: 400px;
+        height: 100vh;
+        max-height: 700px;
         background: white;
         border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         overflow: hidden;
         position: relative;
+        margin: 0 auto;
+      }
+
+      @media (max-width: 480px) {
+        .game-container {
+          width: 100vw;
+          height: 100vh;
+          border-radius: 0;
+          max-height: none;
+        }
+
+        body {
+          margin: 0;
+          padding: 0;
+        }
       }
 
       .game-header {
@@ -57,6 +74,8 @@
         background: #f8f9fa;
         display: block;
         cursor: pointer;
+        width: 100%;
+        height: auto;
       }
 
       .game-over {
@@ -70,6 +89,7 @@
         border-radius: 20px;
         text-align: center;
         display: none;
+        z-index: 10;
       }
 
       .final-score {
@@ -96,17 +116,43 @@
         transform: scale(1.05);
       }
 
-      .instructions {
+      .music-btn {
         position: absolute;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
+        top: 20px;
+        right: 20px;
         background: rgba(255, 255, 255, 0.9);
-        padding: 10px 20px;
-        border-radius: 20px;
-        font-size: 14px;
-        color: #333;
-        text-align: center;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        z-index: 100;
+      }
+
+      .music-btn:hover {
+        background: white;
+        transform: scale(1.1);
+      }
+
+      .music-btn.playing {
+        animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+        }
       }
 
       .start-screen {
@@ -122,6 +168,7 @@
         align-items: center;
         color: white;
         text-align: center;
+        z-index: 20;
       }
 
       .start-title {
@@ -154,6 +201,21 @@
         transform: translateY(-5px);
         box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
       }
+
+      .instructions {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        color: #333;
+        text-align: center;
+        width: 90%;
+        max-width: 300px;
+      }
     </style>
   </head>
   <body>
@@ -165,6 +227,10 @@
         </div>
         <button class="start-btn" onclick="startGame()">🎮 PLAY</button>
       </div>
+
+      <button class="music-btn" id="musicBtn" onclick="toggleMusic()">
+        🎵
+      </button>
 
       <div class="game-header">
         <div class="game-title">🌈 COLOR RUSH</div>
@@ -204,6 +270,9 @@
       let colorBoxes = [];
       let gameTimer;
       let countdownTimer;
+      let isMusicPlaying = false;
+      let audioContext;
+      let backgroundMusic;
 
       const colors = [
         { name: "RED", color: "#ff4757", emoji: "🔴" },
@@ -213,6 +282,99 @@
         { name: "PURPLE", color: "#a55eea", emoji: "🟣" },
         { name: "ORANGE", color: "#ff7675", emoji: "🟠" },
       ];
+
+      // Audio setup
+      function initAudio() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      function playBeep(frequency = 440, duration = 200, type = "sine") {
+        if (!audioContext) initAudio();
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = type;
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.01,
+          audioContext.currentTime + duration / 1000
+        );
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration / 1000);
+      }
+
+      function playCorrectSound() {
+        playBeep(800, 200, "sine"); // High pleasant beep
+      }
+
+      function playWrongSound() {
+        playBeep(200, 300, "sawtooth"); // Low harsh sound
+      }
+
+      function playGameOverSound() {
+        setTimeout(() => playBeep(400, 200), 0);
+        setTimeout(() => playBeep(350, 200), 100);
+        setTimeout(() => playBeep(300, 400), 200);
+      }
+
+      function startBackgroundMusic() {
+        if (!audioContext) initAudio();
+        if (backgroundMusic) backgroundMusic.stop();
+
+        // Create simple background music loop
+        const notes = [523.25, 587.33, 659.25, 698.46]; // C5, D5, E5, F5
+        let noteIndex = 0;
+
+        function playNote() {
+          if (!isMusicPlaying) return;
+
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = notes[noteIndex % notes.length];
+          oscillator.type = "triangle";
+
+          gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioContext.currentTime + 0.8
+          );
+
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.8);
+
+          noteIndex++;
+          if (isMusicPlaying) {
+            setTimeout(playNote, 800);
+          }
+        }
+
+        playNote();
+      }
+
+      function toggleMusic() {
+        isMusicPlaying = !isMusicPlaying;
+        const musicBtn = document.getElementById("musicBtn");
+
+        if (isMusicPlaying) {
+          musicBtn.textContent = "🔊";
+          musicBtn.classList.add("playing");
+          startBackgroundMusic();
+        } else {
+          musicBtn.textContent = "🔇";
+          musicBtn.classList.remove("playing");
+        }
+      }
 
       function startGame() {
         document.getElementById("startScreen").style.display = "none";
@@ -235,41 +397,54 @@
         // Wähle zufällige Zielfarbe
         currentColor = colors[Math.floor(Math.random() * colors.length)];
 
-        // Erstelle 6 Farbboxen
-        colorBoxes = [];
-        const boxSize = 120;
-        const margin = 20;
+        // Erstelle 6 verschiedene Farben (inkl. der richtigen)
+        const gameColors = [currentColor]; // Richtige Farbe
 
+        // Füge 5 verschiedene falsche Farben hinzu
+        while (gameColors.length < 6) {
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          if (!gameColors.includes(randomColor)) {
+            gameColors.push(randomColor);
+          }
+        }
+
+        // ECHTES Mischen der Farben - Fisher-Yates Shuffle
+        for (let i = gameColors.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [gameColors[i], gameColors[j]] = [gameColors[j], gameColors[i]];
+        }
+
+        // Verbesserte Berechnung für optimale Box-Größe und Positionierung
+        const availableWidth = canvas.width - 40; // 20px margin on each side
+        const availableHeight = canvas.height - 80; // Weniger Platz für Header reserviert
+
+        // Berechne optimale Box-Größe für 2x3 Grid
+        const maxBoxWidth = (availableWidth - 30) / 2; // 30px total margin between boxes
+        const maxBoxHeight = (availableHeight - 60) / 3; // 60px total margin zwischen Zeilen
+        const boxSize = Math.min(maxBoxWidth, maxBoxHeight, 95); // Etwas kleiner für besseren Fit
+
+        // Zentriere das Grid - WEITER NACH OBEN verschoben
+        const totalGridWidth = boxSize * 2 + 15; // 15px margin between columns
+        const totalGridHeight = boxSize * 3 + 30; // 15px margin between rows
+        const startX = (canvas.width - totalGridWidth) / 2;
+        const startY = 60; // Fixe Position nach oben verschoben (war: 80 + berechnung)
+
+        // Erstelle Farbboxen mit optimiertem Layout
+        colorBoxes = [];
         for (let i = 0; i < 6; i++) {
           const row = Math.floor(i / 2);
           const col = i % 2;
-          const x = margin + col * (boxSize + margin);
-          const y = 100 + row * (boxSize + margin);
-
-          // Eine Box hat die richtige Farbe, andere sind zufällig
-          let boxColor;
-          if (i === 0) {
-            boxColor = currentColor;
-          } else {
-            do {
-              boxColor = colors[Math.floor(Math.random() * colors.length)];
-            } while (boxColor === currentColor);
-          }
+          const x = startX + col * (boxSize + 15);
+          const y = startY + row * (boxSize + 15);
 
           colorBoxes.push({
             x: x,
             y: y,
             width: boxSize,
             height: boxSize,
-            color: boxColor,
-            isCorrect: boxColor === currentColor,
+            color: gameColors[i],
+            isCorrect: gameColors[i] === currentColor,
           });
-        }
-
-        // Mische die Boxen
-        for (let i = colorBoxes.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [colorBoxes[i], colorBoxes[j]] = [colorBoxes[j], colorBoxes[i]];
         }
 
         drawGame();
@@ -293,7 +468,7 @@
         colorBoxes.forEach((box) => {
           // Box Schatten
           ctx.fillStyle = "rgba(0,0,0,0.2)";
-          ctx.fillRect(box.x + 5, box.y + 5, box.width, box.height);
+          ctx.fillRect(box.x + 3, box.y + 3, box.width, box.height);
 
           // Box
           ctx.fillStyle = box.color.color;
@@ -301,17 +476,18 @@
 
           // Box Border
           ctx.strokeStyle = "#fff";
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 3;
           ctx.strokeRect(box.x, box.y, box.width, box.height);
 
           // Emoji in der Mitte
-          ctx.font = "40px Arial";
+          const emojiSize = Math.min(box.width * 0.4, 30);
+          ctx.font = `${emojiSize}px Arial`;
           ctx.fillStyle = "#fff";
           ctx.textAlign = "center";
           ctx.fillText(
             box.color.emoji,
             box.x + box.width / 2,
-            box.y + box.height / 2 + 15
+            box.y + box.height / 2 + emojiSize / 3
           );
         });
       }
@@ -332,11 +508,13 @@
           ) {
             if (box.isCorrect) {
               score += 10;
+              playCorrectSound();
               showCorrectFeedback(box);
               setTimeout(() => {
                 generateNewRound();
               }, 300);
             } else {
+              playWrongSound();
               showWrongFeedback(box);
               score = Math.max(0, score - 5);
             }
@@ -347,18 +525,18 @@
 
       function showCorrectFeedback(box) {
         ctx.fillStyle = "rgba(46, 213, 115, 0.8)";
-        ctx.fillRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20);
+        ctx.fillRect(box.x - 5, box.y - 5, box.width + 10, box.height + 10);
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 30px Arial";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
         ctx.fillText("✓ +10", box.x + box.width / 2, box.y + box.height / 2);
       }
 
       function showWrongFeedback(box) {
         ctx.fillStyle = "rgba(255, 71, 87, 0.8)";
-        ctx.fillRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20);
+        ctx.fillRect(box.x - 5, box.y - 5, box.width + 10, box.height + 10);
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 30px Arial";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
         ctx.fillText("✗ -5", box.x + box.width / 2, box.y + box.height / 2);
       }
@@ -371,6 +549,7 @@
       function endGame() {
         gameState = "gameOver";
         clearInterval(countdownTimer);
+        playGameOverSound();
         document.getElementById("finalScore").textContent = score;
         document.getElementById("gameOver").style.display = "block";
       }
@@ -391,6 +570,39 @@
         });
         canvas.dispatchEvent(mouseEvent);
       });
+
+      // Initial setup
+      function setupCanvas() {
+        const container = document.querySelector(".game-container");
+        const containerWidth = container.clientWidth;
+
+        // Verbesserte Canvas-Höhe Berechnung
+        const headerHeight = 120; // Ungefähre Header-Höhe
+        const instructionsHeight = 60; // Ungefähre Instructions-Höhe
+        const minGameHeight = 450; // Mindesthöhe für das Spiel
+
+        let canvasHeight;
+        if (window.innerHeight > 700) {
+          canvasHeight = Math.max(
+            520,
+            window.innerHeight - headerHeight - instructionsHeight
+          );
+        } else {
+          canvasHeight = Math.max(
+            minGameHeight,
+            window.innerHeight - headerHeight - 40
+          );
+        }
+
+        canvas.width = containerWidth;
+        canvas.height = canvasHeight;
+        canvas.style.width = containerWidth + "px";
+        canvas.style.height = canvasHeight + "px";
+      }
+
+      // Initial canvas setup
+      setupCanvas();
+      window.addEventListener("resize", setupCanvas);
 
       // Initial draw
       ctx.fillStyle = "#f8f9fa";
