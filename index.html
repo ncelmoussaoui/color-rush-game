@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color Rush - TikTok Game</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      .game-container {
+        width: 400px;
+        height: 600px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .game-header {
+        background: linear-gradient(45deg, #ff6b6b, #ffa500);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        position: relative;
+      }
+
+      .game-title {
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .score-time {
+        display: flex;
+        justify-content: space-between;
+        font-size: 18px;
+        font-weight: bold;
+      }
+
+      .game-canvas {
+        background: #f8f9fa;
+        display: block;
+        cursor: pointer;
+      }
+
+      .game-over {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        display: none;
+      }
+
+      .final-score {
+        font-size: 36px;
+        color: #ffa500;
+        margin: 20px 0;
+        font-weight: bold;
+      }
+
+      .restart-btn {
+        background: linear-gradient(45deg, #ff6b6b, #ffa500);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 10px;
+        cursor: pointer;
+        margin-top: 20px;
+        transition: transform 0.2s;
+      }
+
+      .restart-btn:hover {
+        transform: scale(1.05);
+      }
+
+      .instructions {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        color: #333;
+        text-align: center;
+      }
+
+      .start-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        text-align: center;
+      }
+
+      .start-title {
+        font-size: 48px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      .start-subtitle {
+        font-size: 18px;
+        margin-bottom: 40px;
+        opacity: 0.9;
+      }
+
+      .start-btn {
+        background: linear-gradient(45deg, #ff6b6b, #ffa500);
+        color: white;
+        border: none;
+        padding: 20px 40px;
+        font-size: 24px;
+        font-weight: bold;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .start-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-container">
+      <div class="start-screen" id="startScreen">
+        <div class="start-title">🌈 COLOR RUSH</div>
+        <div class="start-subtitle">
+          Tap the right color as fast as possible!
+        </div>
+        <button class="start-btn" onclick="startGame()">🎮 PLAY</button>
+      </div>
+
+      <div class="game-header">
+        <div class="game-title">🌈 COLOR RUSH</div>
+        <div class="score-time">
+          <div>Score: <span id="score">0</span></div>
+          <div>Time: <span id="time">30</span>s</div>
+        </div>
+      </div>
+
+      <canvas
+        class="game-canvas"
+        id="gameCanvas"
+        width="400"
+        height="480"
+      ></canvas>
+
+      <div class="game-over" id="gameOver">
+        <h2>🎉 Game Over!</h2>
+        <div class="final-score" id="finalScore">0</div>
+        <p>Share your score on TikTok!</p>
+        <button class="restart-btn" onclick="restartGame()">
+          🔄 Play Again
+        </button>
+      </div>
+
+      <div class="instructions">Tap the color shown above! 🎯</div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      let gameState = "start"; // 'start', 'playing', 'gameOver'
+      let score = 0;
+      let timeLeft = 30;
+      let currentColor = "";
+      let colorBoxes = [];
+      let gameTimer;
+      let countdownTimer;
+
+      const colors = [
+        { name: "RED", color: "#ff4757", emoji: "🔴" },
+        { name: "BLUE", color: "#3742fa", emoji: "🔵" },
+        { name: "GREEN", color: "#2ed573", emoji: "🟢" },
+        { name: "YELLOW", color: "#ffa502", emoji: "🟡" },
+        { name: "PURPLE", color: "#a55eea", emoji: "🟣" },
+        { name: "ORANGE", color: "#ff7675", emoji: "🟠" },
+      ];
+
+      function startGame() {
+        document.getElementById("startScreen").style.display = "none";
+        gameState = "playing";
+        score = 0;
+        timeLeft = 30;
+        updateUI();
+        generateNewRound();
+
+        countdownTimer = setInterval(() => {
+          timeLeft--;
+          updateUI();
+          if (timeLeft <= 0) {
+            endGame();
+          }
+        }, 1000);
+      }
+
+      function generateNewRound() {
+        // Wähle zufällige Zielfarbe
+        currentColor = colors[Math.floor(Math.random() * colors.length)];
+
+        // Erstelle 6 Farbboxen
+        colorBoxes = [];
+        const boxSize = 120;
+        const margin = 20;
+
+        for (let i = 0; i < 6; i++) {
+          const row = Math.floor(i / 2);
+          const col = i % 2;
+          const x = margin + col * (boxSize + margin);
+          const y = 100 + row * (boxSize + margin);
+
+          // Eine Box hat die richtige Farbe, andere sind zufällig
+          let boxColor;
+          if (i === 0) {
+            boxColor = currentColor;
+          } else {
+            do {
+              boxColor = colors[Math.floor(Math.random() * colors.length)];
+            } while (boxColor === currentColor);
+          }
+
+          colorBoxes.push({
+            x: x,
+            y: y,
+            width: boxSize,
+            height: boxSize,
+            color: boxColor,
+            isCorrect: boxColor === currentColor,
+          });
+        }
+
+        // Mische die Boxen
+        for (let i = colorBoxes.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [colorBoxes[i], colorBoxes[j]] = [colorBoxes[j], colorBoxes[i]];
+        }
+
+        drawGame();
+      }
+
+      function drawGame() {
+        // Lösche Canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Zeichne Zielfarbe
+        ctx.fillStyle = "#333";
+        ctx.font = "bold 24px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          `Find: ${currentColor.name} ${currentColor.emoji}`,
+          canvas.width / 2,
+          40
+        );
+
+        // Zeichne Farbboxen
+        colorBoxes.forEach((box) => {
+          // Box Schatten
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.fillRect(box.x + 5, box.y + 5, box.width, box.height);
+
+          // Box
+          ctx.fillStyle = box.color.color;
+          ctx.fillRect(box.x, box.y, box.width, box.height);
+
+          // Box Border
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+          // Emoji in der Mitte
+          ctx.font = "40px Arial";
+          ctx.fillStyle = "#fff";
+          ctx.textAlign = "center";
+          ctx.fillText(
+            box.color.emoji,
+            box.x + box.width / 2,
+            box.y + box.height / 2 + 15
+          );
+        });
+      }
+
+      function handleCanvasClick(event) {
+        if (gameState !== "playing") return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        colorBoxes.forEach((box) => {
+          if (
+            x >= box.x &&
+            x <= box.x + box.width &&
+            y >= box.y &&
+            y <= box.y + box.height
+          ) {
+            if (box.isCorrect) {
+              score += 10;
+              showCorrectFeedback(box);
+              setTimeout(() => {
+                generateNewRound();
+              }, 300);
+            } else {
+              showWrongFeedback(box);
+              score = Math.max(0, score - 5);
+            }
+            updateUI();
+          }
+        });
+      }
+
+      function showCorrectFeedback(box) {
+        ctx.fillStyle = "rgba(46, 213, 115, 0.8)";
+        ctx.fillRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 30px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("✓ +10", box.x + box.width / 2, box.y + box.height / 2);
+      }
+
+      function showWrongFeedback(box) {
+        ctx.fillStyle = "rgba(255, 71, 87, 0.8)";
+        ctx.fillRect(box.x - 10, box.y - 10, box.width + 20, box.height + 20);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 30px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("✗ -5", box.x + box.width / 2, box.y + box.height / 2);
+      }
+
+      function updateUI() {
+        document.getElementById("score").textContent = score;
+        document.getElementById("time").textContent = timeLeft;
+      }
+
+      function endGame() {
+        gameState = "gameOver";
+        clearInterval(countdownTimer);
+        document.getElementById("finalScore").textContent = score;
+        document.getElementById("gameOver").style.display = "block";
+      }
+
+      function restartGame() {
+        document.getElementById("gameOver").style.display = "none";
+        startGame();
+      }
+
+      // Event Listeners
+      canvas.addEventListener("click", handleCanvasClick);
+      canvas.addEventListener("touchstart", function (e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent("click", {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+        });
+        canvas.dispatchEvent(mouseEvent);
+      });
+
+      // Initial draw
+      ctx.fillStyle = "#f8f9fa";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    </script>
+  </body>
+</html>
